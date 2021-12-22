@@ -1,3 +1,4 @@
+import random
 import sys
 from queue import PriorityQueue
 from typing import List
@@ -5,6 +6,7 @@ import json
 
 from src import GraphInterface
 from DiGraph import DiGraph
+import matplotlib.pyplot as plt
 
 
 class GraphAlgo:
@@ -23,11 +25,11 @@ class GraphAlgo:
             dict = json.load(f)
         for n in dict["Nodes"]:
             if "pos" in n:
-                self.graph.add_node(n["id"], (n['pos']['x'], n['pos']['y']))
+                posi=n['pos'].split(",")
+                self.graph.add_node(n["id"], (float(posi[0]), float(posi[1])))
             else:
                 self.graph.add_node(n["id"])
         for i in dict["Edges"]:
-            print(i["src"], i["dest"], i["w"])
             self.graph.add_edge(int(i["src"]), int(i["dest"]), i["w"])
         return True
         raise NotImplementedError
@@ -72,43 +74,64 @@ class GraphAlgo:
     def TSP(self, node_lst: List[int]) -> (List[int], float):
         total_w = sys.maxsize
         ls_r = []
+        d = 0
 
-        def move(i, dis, db, ls_p, ls_b) -> (List[int], float):
+        def full(ls_p, id) -> bool:
+            dic = self.graph.all_out_edges_of_node(id)
+            for i in dic.items():
+                if (id, i[1]) not in ls_p:
+                    return True
+            return False
 
-            if self.graph.v_size() > len(ls_p) and self.graph.e_size()-2 > len(ls_b):
+        def get_all(ls_p,node_lst)-> bool:
+            for i in node_lst:
+                if i not in ls_p:
+                    return True
+            return False
+
+        def move(i, dis, db, ls_p, ls_b, l, ) -> (List[int], float):
+            global d
+            d = 0
+            if get_all(ls_p,node_lst) and self.graph.e_size() > len(ls_b):
                 w = sys.maxsize
                 k = 0
+                if len(ls_p) == 0:
+                    d = sys.maxsize
+                    return ls_p, d
                 check = False
                 dic = self.graph.all_out_edges_of_node(i)
                 for j in dic.items():
-                    if w > j[1] and (i, j[0]) not in ls_b:
+                    if w > j[1] and (i, j[0]) not in ls_b and full(ls_p, j[0]):
                         w = j[1]
                         db = j[1]
                         k = j[0]
                         check = True
-                print(ls_p)
                 if check:
                     ls_p.append(k)
                     ls_b.append((i, k))
                     dis += db
-                    move(k, dis, db, ls_p, ls_b)
+                    move(k, dis, db, ls_p, ls_b,l)
                 else:
                     b = ls_p.pop()
                     dis -= db
-                    move(b, dis, db, ls_p, ls_b)
-            return ls_p, dis
+                    move(b, dis, db, ls_p, ls_b,l)
+            if d < dis:
+                d = dis
+            return ls_p, d
 
-        for i in self.graph.nodes.keys():
+        for i in node_lst:
             dis = 0
             db = 0
-
+            l = 1
             ls_b = []
             ls_p = [i]
-            ls = move(i, dis, db, ls_p, ls_b)
+            ls = move(i, dis, db, ls_p, ls_b,l)
             a, b = ls
             if total_w > b:
                 total_w = b
                 ls_r = a
+        if total_w == sys.maxsize:
+            return(ls_p, float("inf"))
         return ls_r, total_w
 
     def centerPoint(self) -> (int, float):
@@ -129,10 +152,53 @@ class GraphAlgo:
         return min_p, min_dis
 
     def plot_graph(self) -> None:
-        """
-        Plots the graph.
-        If the nodes have a position, the nodes will be placed there.
-        Otherwise, they will be placed in a random but elegant manner.
-        @return: None
-        """
-        raise NotImplementedError
+        plt.close()
+        max_x = 0
+        min_x = float('inf')
+        max_y = 0
+        min_y = float('inf')
+        for n in self.graph.nodes.values():
+            if n.pos:
+                if n.pos[0] > max_x:
+                    max_x = n.pos[0]
+                if n.pos[0] < min_x:
+                    min_x = n.pos[0]
+                if n.pos[1] > max_y:
+                    max_y = n.pos[1]
+                if n.pos[1] < min_y:
+                    min_y = n.pos[1]
+        print(min_x)
+        print(min_y)
+
+        if min_x == float('inf'):
+            max_x = 1
+            min_x = 0
+        if min_y==float('inf'):
+            max_y = 1
+            min_y = 0
+        if min_x==max_x:
+            max_x=max_x+0.5
+        if min_y==max_y:
+            max_y=max_y+0.5
+        x = []
+        y = []
+        for n in self.graph.nodes.values():
+            if not n.pos:
+                n.pos = random.uniform(min_x, max_x), random.uniform(min_y, max_y)
+            x.append(n.pos[0])
+            y.append((n.pos[1]))
+        # plt.plot(x,y,".")
+        # plt.show()
+        for v in self.graph.nodes.values():
+            x, y = v.pos[0], v.pos[1]
+            plt.plot(x, y, markersize=4, marker='o', color='blue')
+            plt.text(x, y, str(v.id), color="red", fontsize=12)
+            for i in self.graph.all_out_edges_of_node(v.id).items():
+                nai = i[0]
+                w = i[1]
+                u = self.graph.nodes[nai]
+                x_, y_ = u.pos[0], u.pos[1]
+                plt.annotate("", xy=(x, y), xytext=(x_, y_), arrowprops=dict(arrowstyle="<-"))
+
+        plt.show()
+
