@@ -10,8 +10,8 @@ class DiGraph:
 
     def e_size(self) -> int:
         size=0
-        for i in self.nodes:
-            size += i.GetSize()
+        for i in self.nodes.values():
+            size += len(i.edges)
         return size
         raise NotImplementedError
 
